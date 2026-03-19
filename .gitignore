@@ -61,14 +61,16 @@ labels.zip
 *.pth
 *.pt
 *.ckpt
-models_split/**/*.pth
-models_split_v2/**/*.pth
-models_split/**/*.ckpt
-models_split_v2/**/*.ckpt
+models_split/
+models_split_v2/
+models_export/
+models_export_v2/
 
 # Results and outputs
 results_split/
 results_split_v2/
+results_export/
+results_export_v2/
 test_results/
 test_results_v2/
 kitti_output_train/

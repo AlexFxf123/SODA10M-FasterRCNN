@@ -568,6 +568,10 @@ def evaluate_model(model, data_loader, device, iou_threshold=0.5, score_threshol
     """
     model.eval()
     
+    # 验证集损失统计
+    total_val_loss = 0
+    val_loss_count = 0
+    
     # 统计变量
     total_gt_boxes = 0
     total_pred_boxes = 0
@@ -585,17 +589,40 @@ def evaluate_model(model, data_loader, device, iou_threshold=0.5, score_threshol
     all_ground_truths = []
     
     print("开始评估模型...")
+    
+    # 切换到evaluation模式但计算loss
+    model.train()  # 保持训练模式以计算loss
+    
     with torch.no_grad():
         for batch_idx, (images, targets) in enumerate(tqdm(data_loader, desc="评估")):
-            # 跳过没有目标的样本
-            if len(targets[0]['boxes']) == 0:
+            # 过滤掉没有目标的样本
+            valid_indices = []
+            for i, target in enumerate(targets):
+                if len(target['boxes']) > 0:
+                    valid_indices.append(i)
+            
+            if len(valid_indices) == 0:
+                # 如果整个批次都没有目标，跳过
                 continue
             
-            # 将图片移到设备
-            images = [img.to(device) for img in images]
+            # 只保留有目标的样本
+            images = [images[i] for i in valid_indices]
+            targets = [targets[i] for i in valid_indices]
             
-            # 模型预测
+            # 将图片和标注移到设备
+            images = [img.to(device) for img in images]
+            targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+            
+            # 计算验证集损失
+            loss_dict = model(images, targets)
+            losses = sum(loss for loss in loss_dict.values())
+            total_val_loss += losses.item()
+            val_loss_count += 1
+            
+            # 切换到eval模式获取预测
+            model.eval()
             predictions = model(images)
+            model.train()  # 切换回train模式
             
             for i, (pred, target) in enumerate(zip(predictions, targets)):
                 # 获取预测结果
@@ -692,11 +719,18 @@ def evaluate_model(model, data_loader, device, iou_threshold=0.5, score_threshol
     # 计算mAP
     mean_ap = calculate_map(all_predictions, all_ground_truths, iou_threshold, device)
     
+    # 计算平均验证损失
+    avg_val_loss = total_val_loss / val_loss_count if val_loss_count > 0 else 0
+    
+    # 恢复到eval模式
+    model.eval()
+    
     metrics = {
         'precision': precision,
         'recall': recall,
         'f1_score': f1_score,
         'mean_average_precision': mean_ap,
+        'val_loss': avg_val_loss,
         'total_gt_boxes': total_gt_boxes,
         'total_pred_boxes': total_pred_boxes,
         'total_true_positives': total_true_positives,
@@ -861,10 +895,10 @@ def plot_training_metrics(train_losses, val_metrics, save_dir):
     os.makedirs(save_dir, exist_ok=True)
     
     # 绘制训练损失
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(15, 10))
     
-    plt.subplot(2, 2, 1)
-    plt.plot(train_losses, label='Training Loss')
+    plt.subplot(2, 3, 1)
+    plt.plot(train_losses, label='Training Loss', color='blue')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.title('Training Loss')
@@ -876,21 +910,50 @@ def plot_training_metrics(train_losses, val_metrics, save_dir):
     precisions = [m['precision'] for m in val_metrics]
     recalls = [m['recall'] for m in val_metrics]
     maps = [m['mean_average_precision'] for m in val_metrics]
+    val_losses = [m.get('val_loss', 0) for m in val_metrics]
     
-    plt.subplot(2, 2, 2)
-    plt.plot(epochs, precisions, label='Precision')
-    plt.plot(epochs, recalls, label='Recall')
+    plt.subplot(2, 3, 2)
+    plt.plot(epochs, precisions, label='Precision', marker='o')
+    plt.plot(epochs, recalls, label='Recall', marker='s')
     plt.xlabel('Epoch')
     plt.ylabel('Score')
     plt.title('Precision and Recall')
     plt.legend()
     plt.grid(True)
     
-    plt.subplot(2, 2, 3)
-    plt.plot(epochs, maps, label='mAP')
+    plt.subplot(2, 3, 3)
+    plt.plot(epochs, maps, label='mAP', color='green', marker='o')
     plt.xlabel('Epoch')
     plt.ylabel('mAP')
     plt.title('Mean Average Precision')
+    plt.legend()
+    plt.grid(True)
+    
+    plt.subplot(2, 3, 4)
+    plt.plot(train_losses, label='Training Loss', color='blue', marker='o')
+    plt.plot(epochs, val_losses, label='Validation Loss', color='red', marker='s')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training vs Validation Loss')
+    plt.legend()
+    plt.grid(True)
+    
+    plt.subplot(2, 3, 5)
+    f1_scores = [m['f1_score'] for m in val_metrics]
+    plt.plot(epochs, f1_scores, label='F1 Score', color='purple', marker='o')
+    plt.xlabel('Epoch')
+    plt.ylabel('F1 Score')
+    plt.title('F1 Score During Training')
+    plt.legend()
+    plt.grid(True)
+    
+    plt.subplot(2, 3, 6)
+    plt.plot(epochs, [m['total_true_positives'] for m in val_metrics], label='True Positives', marker='o', color='orange')
+    plt.plot(epochs, [m['total_pred_boxes'] for m in val_metrics], label='Predicted Boxes', marker='s', color='green')
+    plt.plot(epochs, [m['total_gt_boxes'] for m in val_metrics], label='Ground Truth Boxes', marker='^', color='red')
+    plt.xlabel('Epoch')
+    plt.ylabel('Count')
+    plt.title('Detection Statistics')
     plt.legend()
     plt.grid(True)
     
@@ -941,8 +1004,8 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='训练Faster R-CNN模型，支持从现有模型继续训练')
-    parser.add_argument('--model_path', type=str, default='models_split/faster_rcnn_best.pth',
-                       help='从指定的模型文件恢复训练 (默认: models_split/faster_rcnn_best.pth)')
+    parser.add_argument('--model_path', type=str, default='models_export/faster_rcnn_best.pth',
+                       help='从指定的模型文件恢复训练 (默认: models_export/faster_rcnn_best.pth)')
     parser.add_argument('--epochs_per_session', type=int, default=25,
                        help='每次训练轮次 (默认: 25)')
     parser.add_argument('--force_restart', action='store_true',
@@ -975,8 +1038,8 @@ def main():
         'device': 'cuda' if torch.cuda.is_available() else 'cpu',
         
         # 输出路径
-        'model_save_dir': 'models_split',
-        'results_save_dir': 'results_split',
+        'model_save_dir': 'models_export',
+        'results_save_dir': 'results_export',
         'split_info_dir': 'split_info',
         
         # 类别
@@ -1175,10 +1238,14 @@ def main():
             score_threshold=config['score_threshold']
         )
         
+        # 评估后恢复训练模式
+        model.train()
+        
         val_metrics_list.append(val_metrics)
         
         # 打印评估结果
         print(f"\n评估结果 (Epoch {epoch+1}):")
+        print(f"  验证集损失 (Val Loss): {val_metrics['val_loss']:.4f}")
         print(f"  精确度 (Precision): {val_metrics['precision']:.4f}")
         print(f"  召回率 (Recall): {val_metrics['recall']:.4f}")
         print(f"  F1分数: {val_metrics['f1_score']:.4f}")
