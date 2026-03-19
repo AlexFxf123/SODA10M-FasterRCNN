@@ -1,0 +1,10 @@
+# 这里将华为的2D数据集SODA10M用来验证FasterRCNN的效果
+# 首先下载的数据集为labeled_test.tar和labeled_trainval.tar,分别为带标注的测试集和训练集
+# 然后解压数据集，将labeled_test解压到当前目录下，将labeled_trainval解压到当前目录下
+# 将labeled_trainval中的标注数据转成kitti格式（soda10m_to_kitti.py），分别放到kitti_output_train和kitti_output_val目录下
+# 然后将labeled_trainval目录下的train和val均作为图片放到images中，将kitti_output_train和kitti_output_val的标注结果放到labels中
+# 用DEEPSEEK写训练脚本train_model.py，模型放到models_split，结果放到results_split，划分信息放到split_info
+# 推理结果用test_model.py，推理图片放到test_images中，推理结果放到test_results中
+
+# FasterRCNN模型的V2版本，直接使用预训练参数训练时容易过拟合，训练集loss在下降，但验证集的mAp和召回率等会下降
+# 使用V2版本训练，不使用预训练权重

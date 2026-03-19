@@ -1,0 +1,104 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# PyCharm
+.PyCharm.jinja2
+.idea
+
+# Large data files
+*.tar
+*.tar.gz
+*.zip
+*.7z
+labeled_test.tar
+labeled_trainval.tar
+labels.zip
+
+# Model weights and checkpoints (very large files)
+*.pth
+*.pt
+*.ckpt
+models_split/**/*.pth
+models_split_v2/**/*.pth
+models_split/**/*.ckpt
+models_split_v2/**/*.ckpt
+
+# Results and outputs
+results_split/
+results_split_v2/
+test_results/
+test_results_v2/
+kitti_output_train/
+kitti_output_val/
+
+# Dataset files
+images/
+labels/
+labels_origin/
+labels_area2500/
+labels_area5000/
+test_images/
+test_kitti_anno/
+
+# Statistics
+statistics_origin/
+statistics_area2500/
+statistics_area5000/
+
+# Split info
+split_info/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Cache
+.cache/
+*.cache
