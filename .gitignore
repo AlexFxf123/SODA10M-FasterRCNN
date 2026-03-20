@@ -71,10 +71,12 @@ results_split/
 results_split_v2/
 results_export/
 results_export_v2/
+results_val_images/
 test_results/
 test_results_v2/
 kitti_output_train/
 kitti_output_val/
+
 
 # Dataset files
 images/
